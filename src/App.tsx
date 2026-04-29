@@ -1,33 +1,65 @@
 import { useState } from 'react'
 import axios from 'axios'
+// These components are currently written in JS, so they don't ship TS types.
+// We still type our data and UI state in this file to keep `tsc` happy.
+// @ts-ignore - no TS declarations for the JS modules
 import TripForm from './components/TripForm'
+// @ts-ignore - no TS declarations for the JS modules
 import RouteMap from './components/RouteMap'
+// @ts-ignore - no TS declarations for the JS modules
 import LogSheet from './components/LogSheet'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
+type TripFormData = {
+  current_location: string
+  pickup_location: string
+  dropoff_location: string
+  current_cycle_hours: number
+}
+
+type TripPlanResponse = {
+  route: {
+    total_distance_miles: number
+    geometry: unknown
+    segments: unknown
+  }
+  trip: {
+    total_driving_hours: number
+    estimated_days: number
+    stops: unknown[]
+  }
+  daily_logs: Array<{
+    day_number: number
+    // Keep payloads flexible: LogSheet uses many fields dynamically.
+    entries: unknown[]
+    grid?: unknown
+    totals?: Record<string, number>
+    remarks?: string[]
+  }>
+}
+
 function App() {
-  const [tripData, setTripData] = useState(null)
+  const [tripData, setTripData] = useState<TripPlanResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('map')
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'map' | 'logs'>('map')
   const [activeDay, setActiveDay] = useState(0)
 
-  const handleSubmit = async (formData) => {
+  const handleSubmit = async (formData: TripFormData) => {
     setLoading(true)
     setError(null)
     setTripData(null)
 
     try {
-      const response = await axios.post(`${API_URL}/trip-plan/`, formData)
+      const response = await axios.post<TripPlanResponse>(`${API_URL}/trip-plan/`, formData)
       setTripData(response.data)
       setActiveDay(0)
       setActiveTab('map')
     } catch (err) {
-      setError(
-        err.response?.data?.error || 'Could not connect to the server. Please try again.'
-      )
+      const axiosErr = err as any
+      setError(axiosErr?.response?.data?.error || 'Could not connect to the server. Please try again.')
     } finally {
       setLoading(false)
     }
